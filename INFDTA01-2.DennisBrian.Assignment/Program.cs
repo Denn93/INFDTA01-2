@@ -17,7 +17,7 @@ namespace INFDTA01_2.DennisBrian.Assignment
             WineRepository repo = new WineRepository(new Database());
 
             Clustering clustering = new Clustering(repo.GetTransactionModel());
-            clustering.CreateInitialClustering(4);
+            clustering.StartClustering(4);
 
             /* foreach (TransactionMatrixModel row in clustering.TransactionMatrix)
                  Console.WriteLine(row);

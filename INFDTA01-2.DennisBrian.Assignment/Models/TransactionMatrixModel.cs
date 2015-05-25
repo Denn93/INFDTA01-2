@@ -7,7 +7,7 @@ namespace INFDTA01_2.DennisBrian.Assignment.Models
     {
         public int PersonId { get; set; }
 
-        public Dictionary<int, int> Values { get; set; }
+        public int[] Values { get; set; }
 
         public override string ToString()
         {
