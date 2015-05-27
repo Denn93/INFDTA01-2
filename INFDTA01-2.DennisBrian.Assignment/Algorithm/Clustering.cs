@@ -166,7 +166,8 @@ namespace INFDTA01_2.DennisBrian.Assignment.Algorithm
 
                     for (int j = 0; j < 32; j++)
                     {
-                        distance += Math.Pow(personId.Values[j] - centroids[i, j], 2);
+                        distance += EuclideanDistance(personId.Values[j], centroids[i, j]);
+                        /*Math.Pow(personId.Values[j] - centroids[i, j], 2);*/
                     }
 
                     distance = Math.Sqrt(distance);
@@ -185,6 +186,66 @@ namespace INFDTA01_2.DennisBrian.Assignment.Algorithm
             return model.ClusterDistances.Where(
                 m => m.Value.Equals(model.ClusterDistances.Min(n => n.Value)))
                 .Select(m => m.Key).First();
+        }
+
+        private void CalculateSilhouette(int numberClusters, List<ClusterDistanceModel> clusteringResult)
+        {
+            for (int i = 0; i < 4; i++)
+            {
+                List<TransactionMatrixModel> clusterIPersons =
+                    TransactionMatrix.Where(
+                        m =>
+                            clusteringResult.Where(n => n.CurrentCluster == i)
+                                .Select(b => b.PersonId)
+                                .Contains(m.PersonId)).ToList();
+
+                for (int j = i; j < 4; j++)
+                {
+                    List<TransactionMatrixModel> clusterJPersons =
+                    TransactionMatrix.Where(
+                        m =>
+                            clusteringResult.Where(n => n.CurrentCluster == j)
+                                .Select(b => b.PersonId)
+                                .Contains(m.PersonId)).ToList();
+
+                    foreach (TransactionMatrixModel personI in clusterIPersons)
+                    {
+                        CalculateDissimilarity(personI, clusterJPersons);
+                    }
+
+                    clusteringResult.Where(m => m.CurrentCluster == j).Select(m => m.PersonId).ToList();
+                }
+            }
+        }
+
+        private double CalculateDissimilarity(TransactionMatrixModel pointOne, List<TransactionMatrixModel> otherPoints)
+        {
+            List<double> distances = new List<double>();
+            int personCount = 0;
+            foreach (TransactionMatrixModel otherPoint in otherPoints)
+            {
+                if (pointOne.PersonId == otherPoint.PersonId) continue;
+
+                double distance = 0;
+                for (int i = 0; i < 32; i++)
+                {
+                    distance += EuclideanDistance(pointOne.Values[i], otherPoint.Values[i]);
+                }
+
+                distances.Add(Math.Sqrt(distance));
+                personCount++;
+            }
+
+            return distances.Sum() / personCount;
+
+            // elke persoon
+            // distance met adnere in dezelfde cluster
+            // average
+        }
+
+        private double EuclideanDistance(double value, double value2)
+        {
+            return Math.Pow(value - value2, 2);
         }
     }
 }
