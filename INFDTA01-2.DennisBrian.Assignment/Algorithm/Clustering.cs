@@ -7,29 +7,26 @@ namespace INFDTA01_2.DennisBrian.Assignment.Algorithm
 {
     internal class Clustering
     {
-        private List<TransactionModel> _transactions;
-
         public List<TransactionMatrixModel> TransactionMatrix { get; set; }
+
+        public int NumberOfClusters { get; set; }
+
+        public int NumberOfVectors { get; set; }
 
         public Clustering(List<TransactionModel> transactions)
         {
-            _transactions = transactions;
             TransactionMatrix = TransformData(transactions);
+            NumberOfVectors = TransactionMatrix.Select(m => m.Values.Count()).First();
         }
 
-        /// <summary>
-        ///
-        /// </summary>
-        /// <param name="transactions"></param>
-        /// <returns></returns>
-        private static List<TransactionMatrixModel> TransformData(List<TransactionModel> transactions)
+        private List<TransactionMatrixModel> TransformData(List<TransactionModel> transactions)
         {
             int maxOffer = transactions.Max(m => m.OfferteId);
             List<TransactionMatrixModel> result = new List<TransactionMatrixModel>();
 
             foreach (var personTransactions in transactions.GroupBy(m => m.PersonId))
             {
-                TransactionMatrixModel matrixRow = new TransactionMatrixModel { PersonId = personTransactions.Key, Values = new int[32] };
+                TransactionMatrixModel matrixRow = new TransactionMatrixModel { PersonId = personTransactions.Key, Values = new int[maxOffer] };
 
                 for (int i = 0; i < maxOffer; i++)
                     matrixRow.Values[i] = personTransactions.Count(m => m.OfferteId == i + 1) > 0 ? 1 : 0;
@@ -40,15 +37,15 @@ namespace INFDTA01_2.DennisBrian.Assignment.Algorithm
             return result;
         }
 
-        private double[,] CreateInitialCentroids(int numberOfCentroids)
+        private double[,] CreateInitialCentroids()
         {
-            double[,] result = new double[numberOfCentroids, 32];
+            double[,] result = new double[NumberOfClusters, 32];
 
             Random rnd = new Random();
             double value = 0.2;
-            for (int i = 0; i < numberOfCentroids; i++)
+            for (int i = 0; i < NumberOfClusters; i++)
             {
-                for (int j = 0; j < 32; j++)
+                for (int j = 0; j < NumberOfVectors; j++)
                 {
                     result[i, j] = rnd.NextDouble(); // 32 dimensions
                 }
@@ -57,35 +54,31 @@ namespace INFDTA01_2.DennisBrian.Assignment.Algorithm
             return result;
         }
 
-        public void StartClustering(int numberOfCentroids)
+        public List<ClusterDistanceModel> StartClustering(int numberOfCentroids)
         {
-            double[,] centroids = CreateInitialCentroids(numberOfCentroids);
+            NumberOfClusters = numberOfCentroids;
+
+            double[,] centroids = CreateInitialCentroids();
+            double totalDistance = 0;
 
             List<ClusterDistanceModel> result = CalculateDistances(centroids); ;
-            while (!ContainsEmptyCluster(result, numberOfCentroids))
+            while (!ContainsEmptyCluster(result))
             {
-                centroids = CreateInitialCentroids(numberOfCentroids);
+                centroids = CreateInitialCentroids();
                 result = CalculateDistances(centroids);
             }
 
-            List<ClusterDistanceModel> newResult = RecalculateClusters(result, centroids, numberOfCentroids);
-
-            foreach (ClusterDistanceModel clusterDistanceModel in newResult)
-            {
-                Console.WriteLine("PersonId: {0} - CurrentCluster: {1} - Distance: {2}", clusterDistanceModel.PersonId,
-                    clusterDistanceModel.CurrentCluster,
-                    clusterDistanceModel.ClusterDistances[clusterDistanceModel.CurrentCluster]);
-            }
+            return RecalculateClusters(result, centroids);
         }
 
-        private List<ClusterDistanceModel> RecalculateClusters(List<ClusterDistanceModel> initialClusters, double[,] firstCentroids, int numberOfCentroids)
+        private List<ClusterDistanceModel> RecalculateClusters(List<ClusterDistanceModel> initialClusters, double[,] firstCentroids)
         {
             double[,] prevCentroids = firstCentroids;
             List<ClusterDistanceModel> clusterResult = initialClusters;
 
             for (int i = 0; i < 500; i++)
             {
-                double[,] centroids = RecalculateCentroids(clusterResult, numberOfCentroids, prevCentroids);
+                double[,] centroids = RecalculateCentroids(clusterResult, prevCentroids);
 
                 if (!CheckCentroidIsSame(centroids, prevCentroids))
                 {
@@ -101,9 +94,9 @@ namespace INFDTA01_2.DennisBrian.Assignment.Algorithm
 
         private bool CheckCentroidIsSame(double[,] newCentroids, double[,] prevCentroids)
         {
-            for (int i = 0; i < 4; i++)
+            for (int i = 0; i < NumberOfClusters; i++)
             {
-                for (int j = 0; j < 32; j++)
+                for (int j = 0; j < NumberOfVectors; j++)
                 {
                     if (prevCentroids[i, j] != newCentroids[i, j])
                         return false;
@@ -113,9 +106,9 @@ namespace INFDTA01_2.DennisBrian.Assignment.Algorithm
             return true;
         }
 
-        private bool ContainsEmptyCluster(List<ClusterDistanceModel> results, int numberOfClusters)
+        private bool ContainsEmptyCluster(List<ClusterDistanceModel> results)
         {
-            for (int i = 0; i < numberOfClusters; i++)
+            for (int i = 0; i < NumberOfClusters; i++)
             {
                 int count = results.Count(m => m.CurrentCluster == i);
 
@@ -126,15 +119,15 @@ namespace INFDTA01_2.DennisBrian.Assignment.Algorithm
             return true;
         }
 
-        private double[,] RecalculateCentroids(List<ClusterDistanceModel> results, int clusters, double[,] prevCentroids)
+        private double[,] RecalculateCentroids(List<ClusterDistanceModel> results, double[,] prevCentroids)
         {
-            double[,] centroids = new double[clusters, 32];
+            double[,] centroids = new double[NumberOfClusters, 32];
 
             //foreach person sum total values / total in cluster
 
-            for (int i = 0; i < clusters; i++)
+            for (int i = 0; i < NumberOfClusters; i++)
             {
-                for (int j = 0; j < 32; j++)
+                for (int j = 0; j < NumberOfVectors; j++)
                 {
                     List<int> persons = results.Where(m => m.CurrentCluster == i).Select(m => m.PersonId).ToList();
                     int count = TransactionMatrix.Count(m => persons.Contains(m.PersonId));
@@ -160,12 +153,15 @@ namespace INFDTA01_2.DennisBrian.Assignment.Algorithm
                     ClusterDistances = new Dictionary<int, double>()
                 };
 
-                for (int i = 0; i < 4; i++)
+                for (int i = 0; i < NumberOfClusters; i++)
                 {
                     double distance = 0;
 
-                    for (int j = 0; j < 32; j++)
+                    for (int j = 0; j < NumberOfVectors; j++)
                     {
+                        if (personId.Values[j] == 0 && i == j)
+                            continue;
+
                         distance += EuclideanDistance(personId.Values[j], centroids[i, j]);
                         /*Math.Pow(personId.Values[j] - centroids[i, j], 2);*/
                     }
@@ -188,9 +184,12 @@ namespace INFDTA01_2.DennisBrian.Assignment.Algorithm
                 .Select(m => m.Key).First();
         }
 
-        private void CalculateSilhouette(int numberClusters, List<ClusterDistanceModel> clusteringResult)
+        public double CalculateSilhouette(List<ClusterDistanceModel> clusteringResult)
         {
-            for (int i = 0; i < 4; i++)
+            Dictionary<int, double> lowestDissimilarities = new Dictionary<int, double>();
+            Dictionary<int, double> sameClusterDissimilarity = new Dictionary<int, double>();
+
+            for (int i = 0; i < NumberOfClusters; i++)
             {
                 List<TransactionMatrixModel> clusterIPersons =
                     TransactionMatrix.Where(
@@ -199,22 +198,52 @@ namespace INFDTA01_2.DennisBrian.Assignment.Algorithm
                                 .Select(b => b.PersonId)
                                 .Contains(m.PersonId)).ToList();
 
-                for (int j = i; j < 4; j++)
+                for (int j = 0; j < NumberOfClusters; j++)
                 {
                     List<TransactionMatrixModel> clusterJPersons =
-                    TransactionMatrix.Where(
-                        m =>
-                            clusteringResult.Where(n => n.CurrentCluster == j)
-                                .Select(b => b.PersonId)
-                                .Contains(m.PersonId)).ToList();
+                        TransactionMatrix.Where(
+                            m =>
+                                clusteringResult.Where(n => n.CurrentCluster == j)
+                                    .Select(b => b.PersonId)
+                                    .Contains(m.PersonId)).ToList();
 
                     foreach (TransactionMatrixModel personI in clusterIPersons)
                     {
-                        CalculateDissimilarity(personI, clusterJPersons);
-                    }
+                        double dissimilarity = CalculateDissimilarity(personI, clusterJPersons);
 
-                    clusteringResult.Where(m => m.CurrentCluster == j).Select(m => m.PersonId).ToList();
+                        if (
+                            clusteringResult.Where(m => m.CurrentCluster == j)
+                                .Count(m => m.PersonId == personI.PersonId) == 0)
+                            SaveDissimilarities(lowestDissimilarities, dissimilarity, personI.PersonId);
+                        else
+                            SaveDissimilarities(sameClusterDissimilarity, dissimilarity, personI.PersonId);
+                    }
                 }
+            }
+
+            double resultSilhouette = 0;
+            foreach (KeyValuePair<int, double> lowestDissimilarity in lowestDissimilarities)
+            {
+                int personId = lowestDissimilarity.Key;
+                double silhouette = (lowestDissimilarities[personId] - sameClusterDissimilarity[personId]) /
+                                    Math.Max(lowestDissimilarities[personId], sameClusterDissimilarity[personId]);
+
+                resultSilhouette += silhouette;
+            }
+
+            return resultSilhouette / lowestDissimilarities.Count;
+        }
+
+        private void SaveDissimilarities(Dictionary<int, double> list, double dissimilarity, int personId)
+        {
+            if (list.ContainsKey(personId))
+            {
+                double temp = list[personId];
+                list[personId] = (temp > dissimilarity) ? dissimilarity : temp;
+            }
+            else
+            {
+                list.Add(personId, dissimilarity);
             }
         }
 
@@ -224,10 +253,14 @@ namespace INFDTA01_2.DennisBrian.Assignment.Algorithm
             int personCount = 0;
             foreach (TransactionMatrixModel otherPoint in otherPoints)
             {
-                if (pointOne.PersonId == otherPoint.PersonId) continue;
+                if (otherPoints.Count == 1)
+                    return 0;
+
+                if (pointOne.PersonId == otherPoint.PersonId)
+                    continue;
 
                 double distance = 0;
-                for (int i = 0; i < 32; i++)
+                for (int i = 0; i < NumberOfVectors; i++)
                 {
                     distance += EuclideanDistance(pointOne.Values[i], otherPoint.Values[i]);
                 }
@@ -241,6 +274,11 @@ namespace INFDTA01_2.DennisBrian.Assignment.Algorithm
             // elke persoon
             // distance met adnere in dezelfde cluster
             // average
+        }
+
+        public double SumOfSquaredErrors(List<ClusterDistanceModel> result)
+        {
+            return result.Sum(m => Math.Pow(m.ClusterDistances[m.CurrentCluster], 2));
         }
 
         private double EuclideanDistance(double value, double value2)
